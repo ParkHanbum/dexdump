@@ -1,0 +1,38 @@
+sdir := $(srcdir)/libartbase
+odir := $(objdir)/libartbase
+
+ARTBASE_ARCH_SRCS := $(sdir)/arch/instruction_set.cc 
+ARTBASE_BASE_SRCS += $(sdir)/base/allocator.cc	$(sdir)/base/arena_allocator.cc $(sdir)/base/arena_bit_vector.cc
+ARTBASE_BASE_SRCS += $(sdir)/base/enums.cc $(sdir)/base/file_magic.cc $(sdir)/base/file_utils.cc $(sdir)/base/hex_dump.cc $(sdir)/base/hiddenapi_flags.cc
+ARTBASE_BASE_SRCS += $(sdir)/base/malloc_arena_pool.cc $(sdir)/base/membarrier.cc $(sdir)/base/memfd.cc $(sdir)/base/memory_region.cc 
+ARTBASE_BASE_SRCS += $(sdir)/base/os_linux.cc $(sdir)/base/runtime_debug.cc $(sdir)/base/safe_copy.cc $(sdir)/base/scoped_arena_allocator.cc
+ARTBASE_BASE_SRCS += $(sdir)/base/socket_peer_is_trusted.cc $(sdir)/base/time_utils.cc $(sdir)/base/mem_map.cc
+ARTBASE_BASE_SRCS += $(sdir)/base/bit_vector.cc $(sdir)/base/logging.cc $(sdir)/base/scoped_flock.cc 
+ARTBASE_BASE_SRCS += $(sdir)/base/utils.cc $(sdir)/base/zip_archive.cc $(sdir)/base/mem_map_unix.cc
+ARTBASE_UNIX_SRCS += $(sdir)/base/unix_file/fd_file.cc $(sdir)/base/unix_file/random_access_file_utils.cc
+
+ARTBASE_SRCS := $(ARTBASE_BASE_SRCS) $(ARTBASE_ARCH_SRCS) $(ARTBASE_UNIX_SRCS)
+ARTBASE_OBJS := $(patsubst $(sdir)/arch/%.cc,$(odir)/%.op,$(ARTBASE_ARCH_SRCS))
+ARTBASE_OBJS += $(patsubst $(sdir)/base/%.cc,$(odir)/%.op,$(ARTBASE_BASE_SRCS))
+ARTBASE_OBJS += $(patsubst $(sdir)/base/unix_file/%.cc,$(odir)/%.op,$(ARTBASE_UNIX_SRCS))
+
+_CXXFLAGS := $(CXXFLAGS)
+_CXXFLAGS += -I$(LIBZIPARCHIVE_HDRS) -I$(ANDROID_HDRS) -I$(sdir)
+
+all: $(odir)/libartbase.op $(ARTBASE_OBJS)
+
+$(odir)/%.op: $(sdir)/arch/%.cc
+	$(CXX) $(_CXXFLAGS) -c $< -o $@ 
+
+$(odir)/%.op: $(sdir)/base/%.cc
+	$(CXX) $(_CXXFLAGS) -c $< -o $@
+
+$(odir)/%.op: $(sdir)/base/unix_file/%.cc
+	$(CXX) $(_CXXFLAGS) -c $< -o $@ 
+
+$(odir)/libartbase.op: $(ARTBASE_OBJS)
+	$(LD) -r -o $@ $^
+
+clean:
+	rm -f $(odir)/*.op
+	rm -f $(odir)/base/*.op $(odir)/arch/*.op $(odir)/base/unix_file/*.op

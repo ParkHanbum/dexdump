@@ -1,0 +1,8 @@
+*.o
+*.op
+*.ot
+TAGS
+tags
+cscope.*
+*.sw[opn]
+*.patch
