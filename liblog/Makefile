@@ -17,7 +17,7 @@ LIBLOG_SRCS += $(sdir)/fake_writer.cpp
 LIBLOG_OBJS := $(patsubst $(sdir)/%.cpp,$(odir)/%.op,$(LIBLOG_SRCS))
 
 _CXXFLAGS := $(CXXFLAGS) -DFAKE_LOG_DEVICE=1
-_CXXFLAGS += -I$(sdir)/include
+_CXXFLAGS += -I$(sdir)/include -I$(LIBCUTILS_HDRS)
 
 all: $(odir)/liblog.op $(LIBLOG_OBJS)
 

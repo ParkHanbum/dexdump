@@ -18,7 +18,7 @@
 #define ART_LIBDEXFILE_DEX_METHOD_REFERENCE_H_
 
 #include <stdint.h>
-#include <string>
+#include <cstring>
 #include "dex/dex_file.h"
 #include "dex/dex_file_reference.h"
 

@@ -2,9 +2,11 @@
 srcdir := $(CURDIR)
 objdir := $(CURDIR)
 
-DEXDUMP_DEFAULTS := $(srcdir)/dexdump_cfg.cc $(srcdir)/dexdump_main.cc
-DEXDUMP_DEFAULTS += $(srcdir)/dexdump.cc
-DEXDUMP_OBJS :=  $(patsubst $(srcdir)/%.cc,%.op,$(DEXDUMP_DEFAULTS))
+generate_operator_out := $(srcdir)/tools/generate_operator_out.py
+
+DEXDUMP_SRCS := $(srcdir)/dexdump_cfg.cc $(srcdir)/dexdump_main.cc
+DEXDUMP_SRCS += $(srcdir)/dexdump.cc
+DEXDUMP_OBJS :=  $(patsubst $(srcdir)/%.cc,$(objdir)/%.op,$(DEXDUMP_SRCS))
 
 LIBNATIVEHELPER_BASE := $(srcdir)/libnativehelper
 
@@ -18,6 +20,7 @@ LIBARTPALETTE_BASE := $(srcdir)/libartpalette
 LIBZIPARCHIVE_BASE := $(srcdir)/libziparchive
 
 LIBBASE_BASE := $(srcdir)/base
+LIBBASE_HDRS := $(LIBBASE_BASE)/include
 LIBBASE_OBJS := $(LIBBASE_BASE)/libbase.op
 
 LIBLOG_BASE := $(srcdir)/liblog
@@ -50,22 +53,22 @@ LIBLOG_OBJS := $(LIBLOG_BASE)/liblog.op
 
 
 CXX := clang
-CXXFLAGS := -std=gnu++17
+CXXFLAGS := -std=gnu++17 -fPIC
 CXXFLAGS += -DART_STACK_OVERFLOW_GAP_arm=8192 -DART_STACK_OVERFLOW_GAP_arm64=8192 -DART_STACK_OVERFLOW_GAP_mips=16384
 CXXFLAGS += -DART_STACK_OVERFLOW_GAP_mips64=16384 -DART_STACK_OVERFLOW_GAP_x86=16384 -DART_STACK_OVERFLOW_GAP_x86_64=20480
 CXXFLAGS += -DART_FRAME_SIZE_LIMIT=1736
 CXXFLAGS += -D__linux__
 
-LDFLAGS := -lstdc++
+LDFLAGS := -lstdc++ -lz -lpthread -ldl
 
-export srcdir objdir CXX CXXFLAGS
+export srcdir objdir CXX CXXFLAGS generate_operator_out
 export ANDROID_HDRS LIBZIPARCHIVE_HDRS LIBARTPALETTE_HDRS JNI_HDRS
 export LIBCUTILS_HDRS LIBUTILS_HDRS LIBUTILS_HDRS LIBSYSTEM_HDRS
 export LIBC_HDRS LIBLOG_HDRS LIBCUTILS_HDRS LIBUTILS_HDRS
 export LIBZIPARCHIVE_BASE LIBARTBASE_BASE 
 
 
-all: dexdump 
+all: dexdump
 
 $(LIBLOG_OBJS):
 	@$(MAKE) -C $(LIBLOG_BASE)
@@ -82,18 +85,19 @@ $(LIBDEX_OBJS):
 $(LIBARTBASE_OBJS):
 	@$(MAKE) -C $(srcdir)/libartbase
 
-$(DEXDUMP_OBJS): %.op: $(DEXDUMP_DEFAULTS)
-	$(CXX) $(CXXFLAGS) -I$(JNI_HDRS) -I$(LIBARTBASE_BASE) -I$(LIBDEX_BASE) -I$(ANDROID_HDRS) -c -o $@ $<
+$(objdir)/%.op : $(srcdir)/%.cc
+	$(CXX) $(CXXFLAGS) -I$(LIBBASE_HDRS) -I$(JNI_HDRS) -I$(LIBARTBASE_BASE) -I$(LIBDEX_BASE) -I$(ANDROID_HDRS) -c -o $@ $<
 
-dexdump: $(LIBLOG_OBJS) $(LIBZIP_OBJS) $(LIBBASE_OBJS) $(LIBARTBASE_OBJS) $(LIBDEX_OBJS) $(DEXDUMP_OBJS)
-	$(CXX) $(LDFLAGS) -o $@ $^ 
+dexdump: $(DEXDUMP_OBJS) $(LIBLOG_OBJS) $(LIBZIP_OBJS) $(LIBBASE_OBJS) $(LIBARTBASE_OBJS) $(LIBDEX_OBJS)
+	$(CXX) -o $@ $(LDFLAGS) $^
 
 clean:
+	rm -f dexdump
 	rm -f $(srcdir)/*.op
 	@$(MAKE) -sC $(LIBBASE_BASE) clean
 	@$(MAKE) -sC $(LIBZIP_BASE) clean
 	@$(MAKE) -sC $(LIBARTBASE_BASE) clean
 	@$(MAKE) -sC $(LIBDEX_BASE) clean
-
+	@$(MAKE) -sC $(LIBLOG_BASE) clean
 
 
