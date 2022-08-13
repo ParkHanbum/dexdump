@@ -40,6 +40,7 @@ enum OutputFormat {
 struct Options {
   bool checksumOnly;
   bool disassemble;
+  bool disassembleAsIR;
   bool exportsOnly;
   bool ignoreBadChecksum;
   bool disableVerifier;

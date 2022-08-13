@@ -53,6 +53,8 @@
 #include "dex/dex_file_types.h"
 #include "dex/dex_instruction-inl.h"
 #include "dexdump_cfg.h"
+#include "libllvm/ir_builder.h"
+
 
 namespace art {
 
@@ -1162,6 +1164,48 @@ static void dumpBytecodes(const DexFile* pDexFile, u4 idx,
 /*
  * Dumps code of a method.
  */
+static void dumpCodeAsIR(const DexFile *pDexFile, u4 idx, u4 flags,
+                         const dex::CodeItem *pCode, u4 codeOffset) {
+  CodeItemDebugInfoAccessor accessor(*pDexFile, pCode, idx);
+
+  fprintf(gOutFile, "      registers     : %d\n", accessor.RegistersSize());
+  fprintf(gOutFile, "      ins           : %d\n", accessor.InsSize());
+  fprintf(gOutFile, "      outs          : %d\n", accessor.OutsSize());
+  fprintf(gOutFile, "      insns size    : %d 16-bit code units\n",
+          accessor.InsnsSizeInCodeUnits());
+
+  // Bytecode conversion, if requested.
+  llvm::dumpBytecodesAsIR(pDexFile, idx, flags, pCode, codeOffset);
+
+  // Try-catch blocks.
+  dumpCatches(pDexFile, pCode);
+
+  // Positions and locals table in the debug info.
+  bool is_static = (flags & kAccStatic) != 0;
+  fprintf(gOutFile, "      positions     : \n");
+  accessor.DecodeDebugPositionInfo([&](const DexFile::PositionInfo& entry) {
+    fprintf(gOutFile, "        0x%04x line=%d\n", entry.address_, entry.line_);
+    return false;
+  });
+  fprintf(gOutFile, "      locals        : \n");
+  accessor.DecodeDebugLocalInfo(is_static,
+                                idx,
+                                [&](const DexFile::LocalInfo& entry) {
+    const char* signature = entry.signature_ != nullptr ? entry.signature_ : "";
+    fprintf(gOutFile,
+            "        0x%04x - 0x%04x reg=%d %s %s %s\n",
+            entry.start_address_,
+            entry.end_address_,
+            entry.reg_,
+            entry.name_,
+            entry.descriptor_,
+            signature);
+  });
+}
+
+/*
+ * Dumps code of a method.
+ */
 static void dumpCode(const DexFile* pDexFile, u4 idx, u4 flags,
                      const dex::CodeItem* pCode, u4 codeOffset) {
   CodeItemDebugInfoAccessor accessor(*pDexFile, pCode, idx);
@@ -1175,6 +1219,12 @@ static void dumpCode(const DexFile* pDexFile, u4 idx, u4 flags,
   // Bytecode disassembly, if requested.
   if (gOptions.disassemble) {
     dumpBytecodes(pDexFile, idx, pCode, codeOffset);
+  }
+
+  // Bytecode conversion, if requested.
+  if (gOptions.disassembleAsIR) {
+
+    llvm::dumpBytecodesAsIR(pDexFile, idx, flags, pCode, codeOffset);
   }
 
   // Try-catch blocks.
@@ -1246,11 +1296,21 @@ static void dumpMethod(const ClassAccessor::Method& method, int i) {
       fprintf(gOutFile, "      code          : (none)\n");
     } else {
       fprintf(gOutFile, "      code          -\n");
-      dumpCode(&dex_file,
-               method.GetIndex(),
-               flags,
-               method.GetCodeItem(),
-               method.GetCodeItemOffset());
+
+      if (gOptions.disassembleAsIR) {
+        dumpCode(&dex_file,
+                 method.GetIndex(),
+                 flags,
+                 method.GetCodeItem(),
+                 method.GetCodeItemOffset());
+
+      } else {
+        dumpCode(&dex_file,
+                 method.GetIndex(),
+                 flags,
+                 method.GetCodeItem(),
+                 method.GetCodeItemOffset());
+      }
     }
     if (gOptions.disassemble) {
       fputc('\n', gOutFile);
@@ -1541,6 +1601,8 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   if (gOptions.outputFormat == OUTPUT_PLAIN) {
     fprintf(gOutFile, "  Direct methods    -\n");
   }
+
+  llvm::init(accessor);
   i = 0u;
   for (const ClassAccessor::Method& method : accessor.GetDirectMethods()) {
     dumpMethod(method, i);

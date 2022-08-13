@@ -6,5 +6,6 @@ tags
 cscope.*
 *.sw[opn]
 *.patch
+*.a
 
 operator_out.cc

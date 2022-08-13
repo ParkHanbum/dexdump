@@ -39,11 +39,12 @@ static const char* gProgName = "dexdump";
  */
 static void usage() {
   LOG(ERROR) << "Copyright (C) 2007 The Android Open Source Project\n";
-  LOG(ERROR) << gProgName << ": [-a] [-c] [-d] [-e] [-f] [-h] [-i] [-j] [-l layout] [-o outfile]"
+  LOG(ERROR) << gProgName << ": [-a] [-c] [-d] [-e] [-f] [-h] [-i] [-j] [-m] [-l layout] [-o outfile]"
                   " dexfile...\n";
   LOG(ERROR) << " -a : display annotations";
   LOG(ERROR) << " -c : verify checksum and exit";
   LOG(ERROR) << " -d : disassemble code sections";
+  LOG(ERROR) << " -m : disassemble code sections as llvm IR";
   LOG(ERROR) << " -e : display exported items only";
   LOG(ERROR) << " -f : display summary information from file header";
   LOG(ERROR) << " -g : display CFG for dex";
@@ -65,7 +66,7 @@ int dexdumpDriver(int argc, char** argv) {
 
   // Parse all arguments.
   while (true) {
-    const int ic = getopt(argc, argv, "acdefghijl:o:");
+    const int ic = getopt(argc, argv, "acdmefghijl:o:");
     if (ic < 0) {
       break;  // done
     }
@@ -78,6 +79,9 @@ int dexdumpDriver(int argc, char** argv) {
         break;
       case 'd':  // disassemble Dalvik instructions
         gOptions.disassemble = true;
+        break;
+      case 'm': // llvm ir
+        gOptions.disassembleAsIR = true;
         break;
       case 'e':  // exported items only
         gOptions.exportsOnly = true;

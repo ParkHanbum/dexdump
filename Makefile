@@ -51,21 +51,31 @@ LIBLOG_BASE := $(srcdir)/liblog
 LIBLOG_HDRS := $(LIBLOG_BASE)/include
 LIBLOG_OBJS := $(LIBLOG_BASE)/liblog.op
 
+LIBLLVM_BASE := $(srcdir)/libllvm
+LIBLLVM_OBJS := $(LIBLLVM_BASE)/libllvm.op
+LIBLLVM_ARCHIVE := $(LIBLLVM_BASE)/libllvm.a
 
-CXX := clang
+
+CXX := clang++
 CXXFLAGS := -std=gnu++17 -fPIC
 CXXFLAGS += -DART_STACK_OVERFLOW_GAP_arm=8192 -DART_STACK_OVERFLOW_GAP_arm64=8192 -DART_STACK_OVERFLOW_GAP_mips=16384
 CXXFLAGS += -DART_STACK_OVERFLOW_GAP_mips64=16384 -DART_STACK_OVERFLOW_GAP_x86=16384 -DART_STACK_OVERFLOW_GAP_x86_64=20480
 CXXFLAGS += -DART_FRAME_SIZE_LIMIT=1736
 CXXFLAGS += -D__linux__
 
-LDFLAGS := -lstdc++ -lz -lpthread -ldl
+LDFLAGS_LLVM := $(shell llvm-config --system-libs --ldflags --libs)
+LDFLAGS := -g -lstdc++ -lz -lpthread -ldl $(LDFLAGS_LLVM)
 
 export srcdir objdir CXX CXXFLAGS generate_operator_out
+
+# HEADERS
 export ANDROID_HDRS LIBZIPARCHIVE_HDRS LIBARTPALETTE_HDRS JNI_HDRS
 export LIBCUTILS_HDRS LIBUTILS_HDRS LIBUTILS_HDRS LIBSYSTEM_HDRS
-export LIBC_HDRS LIBLOG_HDRS LIBCUTILS_HDRS LIBUTILS_HDRS
-export LIBZIPARCHIVE_BASE LIBARTBASE_BASE 
+export LIBC_HDRS LIBLOG_HDRS LIBCUTILS_HDRS LIBUTILS_HDRS LIBBASE_HDRS
+# BASES
+export LIBZIPARCHIVE_BASE LIBARTBASE_BASE LIBDEX_BASE
+# ARCHIVES
+export LIBLLVM_ARCHIVE
 
 
 all: dexdump
@@ -80,24 +90,29 @@ $(LIBBASE_OBJS):
 	@$(MAKE) -C $(LIBBASE_BASE)
 
 $(LIBDEX_OBJS):
-	@$(MAKE) -C $(srcdir)/libdexfile
+	@$(MAKE) -C $(LIBDEX_BASE)
 
 $(LIBARTBASE_OBJS):
-	@$(MAKE) -C $(srcdir)/libartbase
+	@$(MAKE) -C $(LIBARTBASE_BASE)
+
+$(LIBLLVM_ARCHIVE):
+	@$(MAKE) -C $(LIBLLVM_BASE)
+
 
 $(objdir)/%.op : $(srcdir)/%.cc
-	$(CXX) $(CXXFLAGS) -I$(LIBBASE_HDRS) -I$(JNI_HDRS) -I$(LIBARTBASE_BASE) -I$(LIBDEX_BASE) -I$(ANDROID_HDRS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -I$(LIBBASE_HDRS) -I$(JNI_HDRS) -I$(LIBARTBASE_BASE) -I$(LIBDEX_BASE) -I$(ANDROID_HDRS) -I$(LIBLLVM_BASE) -c -o $@ $<
 
-dexdump: $(DEXDUMP_OBJS) $(LIBLOG_OBJS) $(LIBZIP_OBJS) $(LIBBASE_OBJS) $(LIBARTBASE_OBJS) $(LIBDEX_OBJS)
-	$(CXX) -o $@ $(LDFLAGS) $^
+dexdump: $(DEXDUMP_OBJS) $(LIBLOG_OBJS) $(LIBZIP_OBJS) $(LIBBASE_OBJS) $(LIBARTBASE_OBJS) $(LIBDEX_OBJS) $(LIBLLVM_ARCHIVE)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
 
 clean:
 	rm -f dexdump
 	rm -f $(srcdir)/*.op
+	find . -name '*.o' -exec rm {} \;
 	@$(MAKE) -sC $(LIBBASE_BASE) clean
 	@$(MAKE) -sC $(LIBZIP_BASE) clean
 	@$(MAKE) -sC $(LIBARTBASE_BASE) clean
 	@$(MAKE) -sC $(LIBDEX_BASE) clean
 	@$(MAKE) -sC $(LIBLOG_BASE) clean
-
-
+	@$(MAKE) -sC $(LIBLLVM_BASE) clean
