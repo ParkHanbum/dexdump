@@ -18,6 +18,7 @@
 
 
 using namespace llvm;
+using namespace std;
 
 namespace art {
 namespace llvm {
@@ -340,22 +341,69 @@ char RemapShorty(char shorty_type) {
   u2 num_dalvik_registers;        // method->registers_size.
   u2 num_ins;
   u2 num_outs;
-  u2 num_regs;            // Unlike num_dalvik_registers, does not include ins.
+  u2 num_args;
 
   num_ins = accessor.InsSize();
   num_dalvik_registers = accessor.RegistersSize();
-  num_regs = num_dalvik_registers - num_ins;
+  num_args = num_dalvik_registers - num_ins;
   num_outs = accessor.OutsSize();
   arg_iter->setName("method");
   ++arg_iter;
 
-  int start_sreg = num_regs;
+  vector<const char*> arg_descriptors;
+
+  // TODO :: parse arguments type and reg
+  {
+    LOG(WARNING) << "============== parsing arguments =============";
+    // TODO : add this pointer if not static metohd
+    u2 arg_reg = num_args;
+    vector<art::DexFile::LocalInfo> local_in_reg(num_dalvik_registers);
+    bool is_static = (flags & kAccStatic) != 0;
+    const char *declaring_class_descriptor = pDexFile->GetMethodDeclaringClassDescriptor(pDexFile->GetMethodId(idx));
+    if (!is_static) {
+      const char *descriptor = declaring_class_descriptor;
+      local_in_reg[arg_reg].name_ = "this";
+      local_in_reg[arg_reg].descriptor_ = descriptor;
+      local_in_reg[arg_reg].signature_ = nullptr;
+      local_in_reg[arg_reg].start_address_ = 0;
+      local_in_reg[arg_reg].reg_ = arg_reg;
+      local_in_reg[arg_reg].is_live_ = true;
+      arg_reg++;
+    }
+
+    // TODO :: remain arguments add
+    DexFileParameterIterator it(*pDexFile, pDexFile->GetMethodPrototype(pDexFile->GetMethodId(idx)));
+    for (; it.HasNext(); it.Next()) {
+      const char *descriptor = declaring_class_descriptor;
+      local_in_reg[arg_reg].name_ = "v";
+      local_in_reg[arg_reg].descriptor_ = descriptor;
+      local_in_reg[arg_reg].signature_ = nullptr;
+      local_in_reg[arg_reg].start_address_ = 0;
+      local_in_reg[arg_reg].reg_ = arg_reg;
+      local_in_reg[arg_reg].is_live_ = true;
+      arg_reg++;
+    }
+
+    // TODO :: remove below after code completed.
+    LOG(WARNING) << "[DEBUG]";
+    for (vector<art::DexFile::LocalInfo>::iterator it = local_in_reg.begin(); it != local_in_reg.end(); it++) {
+      LOG(WARNING) << it->descriptor_ << it->name_ << it->reg_;
+    }
+
+    LOG(WARNING) << "============== parsing ENDs =============";
+  }
+
+  num_args = num_dalvik_registers - num_ins;
+  int start_sreg = num_args;
   for (unsigned i = 0; arg_iter != arg_end; ++i, ++arg_iter) {
     arg_iter->setName(android::base::StringPrintf("v%i_0", start_sreg));
   }
 
   bb_ = ::llvm::BasicBlock::Create(*ctx, "bb", func_);
   Builder->SetInsertPoint(bb_);
+
+  // TODO :: allocating local registers and set the value from argument
+
   return func_;
 }
 
