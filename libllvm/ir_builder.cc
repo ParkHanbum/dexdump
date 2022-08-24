@@ -323,19 +323,8 @@ char RemapShorty(char shorty_type) {
   if (el != funcMap.end()) {
     return el->second;
   }
-  
-  const char *shorty = pDexFile->GetMethodShorty(idx);
-  ::llvm::FunctionType* func_type = GetFunctionType(shorty, flags);
-  if (func_type == NULL) {
-    return nullptr;
-  }
 
-  std::string symbol = pDexFile->PrettyMethod(idx);
-  func_ = ::llvm::Function::Create(func_type, type, symbol, gMod);
   CodeItemDebugInfoAccessor accessor(*pDexFile, pCode, idx);
-
-  ::llvm::Function::arg_iterator arg_iter(func_->arg_begin());
-  ::llvm::Function::arg_iterator arg_end(func_->arg_end());
 
   // TODO: much of this info available elsewhere.  Go to the original source?
   u2 num_dalvik_registers;        // method->registers_size.
@@ -347,18 +336,16 @@ char RemapShorty(char shorty_type) {
   num_dalvik_registers = accessor.RegistersSize();
   num_args = num_dalvik_registers - num_ins;
   num_outs = accessor.OutsSize();
-  arg_iter->setName("method");
-  ++arg_iter;
 
   vector<const char*> arg_descriptors;
+  vector<art::DexFile::LocalInfo> local_in_reg(num_dalvik_registers);
+  bool is_static = (flags & kAccStatic) != 0;
 
   // TODO :: parse arguments type and reg
   {
     LOG(WARNING) << "============== parsing arguments =============";
     // TODO : add this pointer if not static metohd
     u2 arg_reg = num_args;
-    vector<art::DexFile::LocalInfo> local_in_reg(num_dalvik_registers);
-    bool is_static = (flags & kAccStatic) != 0;
     const char *declaring_class_descriptor = pDexFile->GetMethodDeclaringClassDescriptor(pDexFile->GetMethodId(idx));
     if (!is_static) {
       const char *descriptor = declaring_class_descriptor;
@@ -374,8 +361,10 @@ char RemapShorty(char shorty_type) {
     // TODO :: remain arguments add
     DexFileParameterIterator it(*pDexFile, pDexFile->GetMethodPrototype(pDexFile->GetMethodId(idx)));
     for (; it.HasNext(); it.Next()) {
+      char *arg_name = (char *)malloc(7); // register cannot over 65535
       const char *descriptor = declaring_class_descriptor;
-      local_in_reg[arg_reg].name_ = "v";
+      sprintf(arg_name, "v%d", arg_reg);
+      local_in_reg[arg_reg].name_ = arg_name;
       local_in_reg[arg_reg].descriptor_ = descriptor;
       local_in_reg[arg_reg].signature_ = nullptr;
       local_in_reg[arg_reg].start_address_ = 0;
@@ -393,10 +382,33 @@ char RemapShorty(char shorty_type) {
     LOG(WARNING) << "============== parsing ENDs =============";
   }
 
-  num_args = num_dalvik_registers - num_ins;
-  int start_sreg = num_args;
-  for (unsigned i = 0; arg_iter != arg_end; ++i, ++arg_iter) {
-    arg_iter->setName(android::base::StringPrintf("v%i_0", start_sreg));
+  // TODO :: Create Function with parsed arguments
+  {
+    LOG(WARNING) << "============== Create Function ===============";
+    const char *shorty = pDexFile->GetMethodShorty(idx);
+    ::llvm::FunctionType *func_type = GetFunctionType(shorty, flags);
+    if (func_type == NULL) {
+      return nullptr;
+    }
+    func_type->print(outs());
+    std::string symbol = pDexFile->PrettyMethod(idx);
+    func_ = ::llvm::Function::Create(func_type, type, symbol, gMod);
+    func_->print(outs());
+    ::llvm::Function::arg_iterator arg_iter(func_->arg_begin());
+    ::llvm::Function::arg_iterator arg_end(func_->arg_end());
+
+    u2 arg_reg = num_args;
+    for (;arg_reg < num_dalvik_registers;arg_reg++) {
+      art::DexFile::LocalInfo li = local_in_reg[arg_reg];
+      LOG(WARNING) << li.name_;
+      arg_iter->setName(li.name_);
+      ++arg_iter;
+    }
+
+    // TODO :: remove below codes after completed
+    LOG(WARNING) << "[DEBUG]";
+    func_->print(outs());
+    LOG(WARNING) << "============== Create Function End =============";
   }
 
   bb_ = ::llvm::BasicBlock::Create(*ctx, "bb", func_);
