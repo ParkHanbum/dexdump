@@ -289,9 +289,6 @@ char RemapShorty(char shorty_type) {
   // Get argument type
   std::vector< ::llvm::Type*> args_type;
 
-  // method object
-  args_type.push_back(getJMethodTy());
-
   // Do we have  a "this"?
   if ((access_flags & kAccStatic) == 0) {
     args_type.push_back(getJObjectTy());
