@@ -412,6 +412,10 @@ char RemapShorty(char shorty_type) {
   Builder->SetInsertPoint(bb_);
 
   // TODO :: allocating local registers and set the value from argument
+  {
+    LOG(WARNING) << "============== Allocating Local Var =============";
+    LOG(WARNING) << "============== Allocating Local Var Ends =============";
+  }
 
   return func_;
 }
