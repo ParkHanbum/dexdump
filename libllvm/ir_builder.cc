@@ -23,6 +23,22 @@ using namespace std;
 namespace art {
 namespace llvm {
 
+struct LocalInfo {
+  LocalInfo() = default;
+
+  const char *name_ = nullptr;       // E.g., list.  It can be nullptr if unknown.
+  const char *descriptor_ = nullptr; // E.g., Ljava/util/LinkedList;
+  const char *signature_ = nullptr;  // E.g., java.util.LinkedList<java.lang.Integer>
+  uint32_t start_address_ = 0;       // PC location where the local is first defined.
+  uint32_t end_address_ = 0;         // PC location where the local is no longer defined.
+  uint16_t reg_ = 0;                 // Dex register which stores the values.
+  bool is_live_ = false;             // Is the local defined and live.
+  ::llvm::Value *val = nullptr;      // keep argument llvm value
+};
+
+// keep all local registers
+std::vector<LocalInfo> local_in_reg;
+
 FILE* gOutFile = stdout;
 
 ::llvm::PointerType *java_object_type_;
@@ -335,7 +351,7 @@ char RemapShorty(char shorty_type) {
   num_outs = accessor.OutsSize();
 
   vector<const char*> arg_descriptors;
-  vector<art::DexFile::LocalInfo> local_in_reg(num_dalvik_registers);
+  vector<LocalInfo> local_in_reg(num_dalvik_registers);
   bool is_static = (flags & kAccStatic) != 0;
 
   // TODO :: parse arguments type and reg
@@ -372,7 +388,7 @@ char RemapShorty(char shorty_type) {
 
     // TODO :: remove below after code completed.
     LOG(WARNING) << "[DEBUG]";
-    for (vector<art::DexFile::LocalInfo>::iterator it = local_in_reg.begin(); it != local_in_reg.end(); it++) {
+    for (vector<LocalInfo>::iterator it = local_in_reg.begin(); it != local_in_reg.end(); it++) {
       LOG(WARNING) << it->descriptor_ << it->name_ << it->reg_;
     }
 
@@ -396,11 +412,13 @@ char RemapShorty(char shorty_type) {
 
     u2 arg_reg = num_args;
     for (;arg_reg < num_dalvik_registers;arg_reg++) {
-      art::DexFile::LocalInfo li = local_in_reg[arg_reg];
-      LOG(WARNING) << li.name_;
-      arg_iter->setName(li.name_);
+      LocalInfo *li = local_in_reg[arg_reg];
+      LOG(WARNING) << "Name : " << li->name_;
+      arg_iter->setName(li->name_);
+      li->llvm_type = arg_iter->getType();
       ++arg_iter;
     }
+    LOG(WARNING) << "==============";
 
     // TODO :: remove below codes after completed
     LOG(WARNING) << "[DEBUG]";
@@ -597,3 +615,4 @@ void dumpBytecodesAsIR(const DexFile *pDexFile, u4 idx, u4 flags,
 
 } // namespace llvm
 } // namespace art
+
