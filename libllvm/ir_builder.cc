@@ -457,7 +457,7 @@ void handleInvokeDirect(const DexFile *pDexFile,
                          u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
                          const Instruction *pDecInsn)  {
   u4 targetIdx = pDecInsn->VRegB_35c();
-  u4 arg[pDecInsn->kMaxVarArgRegs];
+  u4 arg[5];
   pDecInsn->GetVarArgs(arg);
 
   fprintf(stdout, "=============================\n");
@@ -509,9 +509,9 @@ void handleInvokeDirect(const DexFile *pDexFile,
 
   std::vector< ::llvm::Value*> args;
   for (size_t i = 0, count = pDecInsn->VRegA_35c(); i < count; ++i) {
-    u4 temp = arg[i];
+    u4 v_reg = arg[i];
     auto ty = func_type->getParamType(i);
-    auto localReg = new ::llvm::AllocaInst(ty, 0, "v"+temp, bb_);
+    auto localReg = new ::llvm::AllocaInst(ty, 0, to_string(v_reg), bb_);
     args.push_back(localReg);
   }
 
