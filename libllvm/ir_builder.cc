@@ -412,8 +412,7 @@ char RemapShorty(char shorty_type) {
 
     u2 arg_reg = num_args;
     for (;arg_reg < num_dalvik_registers;arg_reg++) {
-      LocalInfo *li = local_in_reg[arg_reg];
-      LOG(WARNING) << "Name : " << li->name_;
+      LocalInfo *li = &local_in_reg[arg_reg];
       arg_iter->setName(li->name_);
       li->llvm_type = arg_iter->getType();
       ++arg_iter;
