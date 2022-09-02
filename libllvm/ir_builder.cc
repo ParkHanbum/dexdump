@@ -436,7 +436,8 @@ char RemapShorty(char shorty_type) {
     for (; arg_reg < num_dalvik_registers; arg_reg++) {
       LocalInfo info = local_in_reg[arg_reg];
       info.llvm_type->print(outs());
-      auto localReg = new ::llvm::AllocaInst(info.llvm_type, 0, to_string(info.reg_), bb_);
+      auto localReg = new ::llvm::AllocaInst(info.llvm_type, 0, "", bb_);
+      new ::llvm::StoreInst(localReg, func_->getArg(0), bb_);
     }
 
     LOG(WARNING) << "============== Allocating Local Var Ends =============";
