@@ -351,7 +351,7 @@ char RemapShorty(char shorty_type) {
   num_outs = accessor.OutsSize();
 
   vector<const char*> arg_descriptors;
-  vector<LocalInfo> local_in_reg(num_dalvik_registers);
+  local_in_reg.resize(num_dalvik_registers);
   bool is_static = (flags & kAccStatic) != 0;
 
   // TODO :: parse arguments type and reg
