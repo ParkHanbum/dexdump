@@ -407,15 +407,11 @@ char RemapShorty(char shorty_type) {
     std::string symbol = pDexFile->PrettyMethod(idx);
     func_ = ::llvm::Function::Create(func_type, type, symbol, gMod);
     func_->print(outs());
-    ::llvm::Function::arg_iterator arg_iter(func_->arg_begin());
-    ::llvm::Function::arg_iterator arg_end(func_->arg_end());
-
     u2 arg_reg = num_args;
-    for (;arg_reg < num_dalvik_registers;arg_reg++) {
+    for (int i = 0;arg_reg < num_dalvik_registers;arg_reg++, i++) {
       LocalInfo *li = &local_in_reg[arg_reg];
-      arg_iter->setName(li->name_);
-      li->llvm_type = arg_iter->getType();
-      ++arg_iter;
+      li->arg = func_->getArg(i);
+      li->arg->setName(li->name_);
     }
     LOG(WARNING) << "==============";
 
