@@ -431,7 +431,7 @@ char RemapShorty(char shorty_type) {
     u2 arg_reg = num_args;
     for (int i = 0; arg_reg < num_dalvik_registers; arg_reg++, i++) {
       LocalInfo info = local_in_reg[arg_reg];
-      auto localReg = new ::llvm::AllocaInst(info.arg->getType() , 0, "", bb_);
+      auto localReg = new ::llvm::AllocaInst(info.arg->getType(), 0, to_string(info.reg_), bb_);
       new ::llvm::StoreInst(localReg, info.arg, bb_);
     }
 
