@@ -479,6 +479,20 @@ void handleConstHigh16(const DexFile *pDexFile,
                        const dex::CodeItem *pCode,
                        u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
                        const Instruction *pDecInsn) {
+  const s4 value = pDecInsn->VRegB() << 16;
+  const s4 vreg = pDecInsn->VRegA();
+  fprintf(gOutFile, " v%d, #int %d // #%x",
+          pDecInsn->VRegA(), value, (u2)pDecInsn->VRegB());
+
+  ::llvm::Type *i32t = ::llvm::Type::getInt32Ty(*ctx);
+  ::llvm::Value *num = ::llvm::ConstantInt::get(i32t, value, true);
+  auto *alloc = new ::llvm::AllocaInst(i32t, 0, "", bb_);
+  auto *store = new ::llvm::StoreInst(num, alloc, bb_);
+  auto *load = new ::llvm::LoadInst(i32t, alloc, "", bb_);
+
+  local_in_reg[vreg].val = load;
+  local_in_reg[vreg].val->print(outs());
+
 }
 
 void handleInvokeDirect(const DexFile *pDexFile,
