@@ -475,6 +475,12 @@ void handleReturnVoid() {
   Builder->CreateRetVoid();
 }
 
+void handleConstHigh16(const DexFile *pDexFile,
+                       const dex::CodeItem *pCode,
+                       u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
+                       const Instruction *pDecInsn) {
+}
+
 void handleInvokeDirect(const DexFile *pDexFile,
                          const dex::CodeItem *pCode,
                          u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
@@ -567,6 +573,7 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
     case Instruction::INVOKE_SUPER:
       break;
     case Instruction::CONST_HIGH16:
+      handleConstHigh16(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
       break;
 
     default:
