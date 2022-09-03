@@ -410,8 +410,8 @@ char RemapShorty(char shorty_type) {
     u2 arg_reg = num_args;
     for (int i = 0;arg_reg < num_dalvik_registers;arg_reg++, i++) {
       LocalInfo *li = &local_in_reg[arg_reg];
-      li->arg = func_->getArg(i);
-      li->arg->setName(li->name_);
+      li->val = func_->getArg(i);
+      li->val->setName(li->name_);
     }
     LOG(WARNING) << "==============";
 
@@ -431,8 +431,8 @@ char RemapShorty(char shorty_type) {
     u2 arg_reg = num_args;
     for (int i = 0; arg_reg < num_dalvik_registers; arg_reg++, i++) {
       LocalInfo info = local_in_reg[arg_reg];
-      auto localReg = new ::llvm::AllocaInst(info.arg->getType(), 0, to_string(info.reg_), bb_);
-      new ::llvm::StoreInst(localReg, info.arg, bb_);
+      auto localReg = new ::llvm::AllocaInst(info.val->getType(), 0, to_string(info.reg_), bb_);
+      new ::llvm::StoreInst(localReg, info.val, bb_);
     }
 
     LOG(WARNING) << "============== Allocating Local Var Ends =============";
