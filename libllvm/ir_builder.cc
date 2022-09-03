@@ -533,9 +533,14 @@ void handleInvokeDirect(const DexFile *pDexFile,
   std::vector< ::llvm::Value*> args;
   for (size_t i = 0, count = pDecInsn->VRegA_35c(); i < count; ++i) {
     u4 v_reg = arg[i];
-    auto ty = func_type->getParamType(i);
-    auto localReg = new ::llvm::AllocaInst(ty, 0, to_string(v_reg), bb_);
-    args.push_back(localReg);
+    LocalInfo *info = &local_in_reg[v_reg];
+    auto fnTy = func_type->getParamType(i);
+    auto regTy = info->val->getType();
+
+    LOG(WARNING) << "HANDLE INVOKE : ";
+    info->val->print(outs());
+    // CHECK(fnTy == regTy);
+    args.push_back(info->val);
   }
 
   ::llvm::CallInst *call = Builder->CreateCall(func_type, func_, args);
