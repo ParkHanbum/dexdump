@@ -430,9 +430,11 @@ char RemapShorty(char shorty_type) {
 
     u2 arg_reg = num_args;
     for (int i = 0; arg_reg < num_dalvik_registers; arg_reg++, i++) {
-      LocalInfo info = local_in_reg[arg_reg];
-      auto localReg = new ::llvm::AllocaInst(info.val->getType(), 0, to_string(info.reg_), bb_);
-      new ::llvm::StoreInst(localReg, info.val, bb_);
+      LocalInfo *info = &local_in_reg[arg_reg];
+      ::llvm::Value* localReg = new ::llvm::AllocaInst(info->val->getType(), 0, "", bb_);
+      new ::llvm::StoreInst(info->val, localReg, bb_);
+      info->val = new ::llvm::LoadInst(info->val->getType(), localReg, "", bb_);
+      info->val->print(outs());
     }
 
     LOG(WARNING) << "============== Allocating Local Var Ends =============";
