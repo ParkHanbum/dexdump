@@ -715,11 +715,50 @@ void handleInvokeVirtual(const DexFile *pDexFile,
   LOG(WARNING) << "===================================[InvokeVirtual]=====================================";
 }
 
+void handleMove(const DexFile *pDexFile,
+                const dex::CodeItem *pCode,
+                u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
+                const Instruction *pDecInsn) {
+  LOG(WARNING) << "===================================[MOVE]=====================================";
+
+  switch (pDecInsn->Opcode()) {
+    case Instruction::MOVE:
+    case Instruction::MOVE_FROM16:
+    case Instruction::MOVE_16:
+    case Instruction::MOVE_WIDE:
+    case Instruction::MOVE_WIDE_FROM16:
+    case Instruction::MOVE_WIDE_16:
+    case Instruction::MOVE_OBJECT:
+    case Instruction::MOVE_OBJECT_16:
+    case Instruction::MOVE_OBJECT_FROM16:
+      u2 vA = pDecInsn->VRegA();
+      u2 vB = pDecInsn->VRegB();
+      ::llvm::Value *val_vA = local_in_reg[vA].val;
+      ::llvm::Value *val_vB = local_in_reg[vB].val;
+      new ::llvm::StoreInst(val_vB, val_vA, bb_);
+      break;
+
+  }
+
+  LOG(WARNING) << "===================================[MOVE]=====================================";
+}
+
 void dumpInstructionAsIR(const DexFile *pDexFile,
                          const dex::CodeItem *pCode,
                          u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
                          const Instruction *pDecInsn)  {
   switch(pDecInsn->Opcode()) {
+    case Instruction::MOVE:
+    case Instruction::MOVE_FROM16:
+    case Instruction::MOVE_16:
+    case Instruction::MOVE_WIDE:
+    case Instruction::MOVE_WIDE_FROM16:
+    case Instruction::MOVE_WIDE_16:
+    case Instruction::MOVE_OBJECT:
+    case Instruction::MOVE_OBJECT_16:
+    case Instruction::MOVE_OBJECT_FROM16:
+      handleMove(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
+      break;
     case Instruction::RETURN_VOID:
       handleReturnVoid();
       break;
