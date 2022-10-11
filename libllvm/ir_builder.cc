@@ -642,6 +642,79 @@ void handleInvokeSuper(const DexFile *pDexFile,
   LOG(WARNING) << "===================================[InvokeSuper]=====================================";
 }
 
+void handleInvokeVirtual(const DexFile *pDexFile,
+                         const dex::CodeItem *pCode,
+                         u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
+                         const Instruction *pDecInsn) {
+  u4 targetIdx = pDecInsn->VRegB_35c();
+  u4 arg[5];
+  pDecInsn->GetVarArgs(arg);
+
+  LOG(WARNING) << "===================================[InvokeVirtual]=====================================";
+  const dex::MethodId& pMethodId = pDexFile->GetMethodId(targetIdx);
+  const dex::ClassDef& ClassDef = pDexFile->GetClassDef(pMethodId.class_idx_.index_);
+  ClassAccessor accessor(*pDexFile, ClassDef, /* parse_hiddenapi_class_data= */ true);
+  const char* classDescriptor = pDexFile->StringByTypeIdx(ClassDef.class_idx_);
+  LOG(WARNING) << "  Class descriptor  : " << classDescriptor << pDecInsn->DumpString(pDexFile).c_str();
+
+  u4 i = 0u;
+  const ClassAccessor::Method *target = nullptr;
+
+  for (const ClassAccessor::Method& method : accessor.GetDirectMethods()) {
+    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
+    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
+    fprintf(stdout, "%s\n", name);
+
+    if (method.GetIndex() == targetIdx) {
+      target = &method;
+    }
+    ++i;
+  }
+  if (target == nullptr) {
+    i = 0u;
+    for (const ClassAccessor::Method &method : accessor.GetVirtualMethods()) {
+    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
+    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
+    fprintf(stdout, "%s\n", name);
+    if (method.GetIndex() == targetIdx) {
+      target = &method;
+    }
+    ++i;
+    }
+  }
+
+  u4 targetFlags;
+  // this method not exist in this current dex file, maybe it primitive type
+  if (target == nullptr) {
+    targetFlags = 0x00001; // TODO : make ensure assume
+    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, external);
+  } else {
+    targetFlags = target->GetAccessFlags();
+    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, internal);
+  }
+
+  const char *shorty = pDexFile->GetMethodShorty(targetIdx);
+  ::llvm::FunctionType* func_type = GetFunctionType(shorty, targetFlags);
+
+
+  std::vector< ::llvm::Value*> args;
+  for (size_t i = 0, count = pDecInsn->VRegA_35c(); i < count; ++i) {
+    u4 v_reg = arg[i];
+    LocalInfo *info = &local_in_reg[v_reg];
+    auto fnTy = func_type->getParamType(i);
+    auto regTy = info->val->getType();
+
+    LOG(WARNING) << "HANDLE INVOKE : ";
+    info->val->print(outs());
+    // CHECK(fnTy == regTy);
+    args.push_back(info->val);
+  }
+
+  ::llvm::CallInst *call = Builder->CreateCall(func_type, func_, args);
+  func_->print(outs());
+  LOG(WARNING) << "===================================[InvokeVirtual]=====================================";
+}
+
 void dumpInstructionAsIR(const DexFile *pDexFile,
                          const dex::CodeItem *pCode,
                          u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
@@ -659,6 +732,9 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
       break;
     case Instruction::INVOKE_SUPER:
       handleInvokeSuper(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
+      break;
+    case Instruction::INVOKE_VIRTUAL:
+      handleInvokeVirtual(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
       break;
     case Instruction::CONST_HIGH16:
       handleConstHigh16(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
