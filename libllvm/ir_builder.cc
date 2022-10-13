@@ -325,6 +325,40 @@ char RemapShorty(char shorty_type) {
   return ::llvm::FunctionType::get(ret_type, args_type, false);
 }
 
+::llvm::Function *CreateFunctionDeclare(const DexFile *pDexFile,
+                                        const dex::CodeItem *pCode,
+                                        u4 idx, u4 flags,
+                                        ::llvm::GlobalVariable::LinkageTypes type) {
+  auto el = funcMap.find(idx);
+  if (el != funcMap.end()) {
+    return el->second;
+  }
+
+  ::llvm::Function *func;
+  ::llvm::BasicBlock *bb;
+
+  // TODO :: Create Function with parsed arguments
+  {
+    LOG(WARNING) << "============== Create Function Declare ===============";
+    const char *shorty = pDexFile->GetMethodShorty(idx);
+    ::llvm::FunctionType *func_type = GetFunctionType(shorty, flags);
+    if (func_type == NULL) {
+      return nullptr;
+    }
+    func_type->print(outs());
+    std::string symbol = pDexFile->PrettyMethod(idx);
+    func = ::llvm::Function::Create(func_type, type, symbol, gMod);
+    func->print(outs());
+
+    // TODO :: remove below codes after completed
+    LOG(WARNING) << "[DEBUG]";
+    func->print(outs());
+    LOG(WARNING) << "============== Create Function Declare End =============";
+  }
+
+  return func;
+}
+
 ::llvm::Function *CreateFunction(const DexFile *pDexFile,
                                  const dex::CodeItem *pCode,
                                  u4 idx, u4 flags,
@@ -503,51 +537,12 @@ void handleInvokeDirect(const DexFile *pDexFile,
   u4 arg[5];
   pDecInsn->GetVarArgs(arg);
 
-  fprintf(stdout, "=============================\n");
+  fprintf(stdout, "===========================[TARGET:%d]==\n", targetIdx);
   const dex::MethodId& pMethodId = pDexFile->GetMethodId(targetIdx);
-  const dex::ClassDef& ClassDef = pDexFile->GetClassDef(pMethodId.class_idx_.index_);
-  ClassAccessor accessor(*pDexFile, ClassDef, /* parse_hiddenapi_class_data= */ true);
-  const char* classDescriptor = pDexFile->StringByTypeIdx(ClassDef.class_idx_);
-  fprintf(stdout, "  Class descriptor  : '%s'\t %s\n", classDescriptor, pDecInsn->DumpString(pDexFile).c_str());
-
-  u4 i = 0u;
-  const ClassAccessor::Method *target = nullptr;
-
-  for (const ClassAccessor::Method& method : accessor.GetDirectMethods()) {
-    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
-    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
-    fprintf(stdout, "%s\n", name);
-
-    if (method.GetIndex() == targetIdx) {
-      target = &method;
-    }
-    ++i;
-  }
-  if (target == nullptr) {
-    i = 0u;
-    for (const ClassAccessor::Method &method : accessor.GetVirtualMethods()) {
-    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
-    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
-    fprintf(stdout, "%s\n", name);
-    if (method.GetIndex() == targetIdx) {
-      target = &method;
-    }
-    ++i;
-    }
-  }
-
-  u4 targetFlags;
-  // this method not exist in this current dex file, maybe it primitive type
-  if (target == nullptr) {
-    targetFlags = 0x00001; // TODO : make ensure assume
-    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, external);
-  } else {
-    targetFlags = target->GetAccessFlags();
-    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, internal);
-  }
-
+  ::llvm::Function *func = CreateFunctionDeclare(pDexFile, pCode, targetIdx, 0x00001, external);
+  func->print(outs());
   const char *shorty = pDexFile->GetMethodShorty(targetIdx);
-  ::llvm::FunctionType* func_type = GetFunctionType(shorty, targetFlags);
+  ::llvm::FunctionType* func_type = GetFunctionType(shorty, 0x00001);
 
 
   std::vector< ::llvm::Value*> args;
@@ -563,7 +558,7 @@ void handleInvokeDirect(const DexFile *pDexFile,
     args.push_back(info->val);
   }
 
-  ::llvm::CallInst *call = Builder->CreateCall(func_type, func_, args);
+  ::llvm::CallInst *call = Builder->CreateCall(func_type, func, args);
   fprintf(stdout, "\n=============================\n");
   func_->print(outs());
   fprintf(stdout, "\n=============================\n");
@@ -579,49 +574,9 @@ void handleInvokeSuper(const DexFile *pDexFile,
 
   LOG(WARNING) << "===================================[InvokeSuper]=====================================";
   const dex::MethodId& pMethodId = pDexFile->GetMethodId(targetIdx);
-  const dex::ClassDef& ClassDef = pDexFile->GetClassDef(pMethodId.class_idx_.index_);
-  ClassAccessor accessor(*pDexFile, ClassDef, /* parse_hiddenapi_class_data= */ true);
-  const char* classDescriptor = pDexFile->StringByTypeIdx(ClassDef.class_idx_);
-  LOG(WARNING) << "  Class descriptor  : " << classDescriptor << pDecInsn->DumpString(pDexFile).c_str();
-
-  u4 i = 0u;
-  const ClassAccessor::Method *target = nullptr;
-
-  for (const ClassAccessor::Method& method : accessor.GetDirectMethods()) {
-    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
-    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
-    fprintf(stdout, "%s\n", name);
-
-    if (method.GetIndex() == targetIdx) {
-      target = &method;
-    }
-    ++i;
-  }
-  if (target == nullptr) {
-    i = 0u;
-    for (const ClassAccessor::Method &method : accessor.GetVirtualMethods()) {
-    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
-    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
-    fprintf(stdout, "%s\n", name);
-    if (method.GetIndex() == targetIdx) {
-      target = &method;
-    }
-    ++i;
-    }
-  }
-
-  u4 targetFlags;
-  // this method not exist in this current dex file, maybe it primitive type
-  if (target == nullptr) {
-    targetFlags = 0x00001; // TODO : make ensure assume
-    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, external);
-  } else {
-    targetFlags = target->GetAccessFlags();
-    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, internal);
-  }
-
+  ::llvm::Function *func = CreateFunctionDeclare(pDexFile, pCode, targetIdx, 0x00001, external);
   const char *shorty = pDexFile->GetMethodShorty(targetIdx);
-  ::llvm::FunctionType* func_type = GetFunctionType(shorty, targetFlags);
+  ::llvm::FunctionType* func_type = GetFunctionType(shorty, 0x00001);
 
 
   std::vector< ::llvm::Value*> args;
@@ -637,7 +592,7 @@ void handleInvokeSuper(const DexFile *pDexFile,
     args.push_back(info->val);
   }
 
-  ::llvm::CallInst *call = Builder->CreateCall(func_type, func_, args);
+  ::llvm::CallInst *call = Builder->CreateCall(func_type, func, args);
   func_->print(outs());
   LOG(WARNING) << "===================================[InvokeSuper]=====================================";
 }
@@ -650,51 +605,12 @@ void handleInvokeVirtual(const DexFile *pDexFile,
   u4 arg[5];
   pDecInsn->GetVarArgs(arg);
 
-  LOG(WARNING) << "===================================[InvokeVirtual]=====================================";
+  LOG(WARNING) << "=======[InvokeVirtual : " <<  targetIdx << "]========";
+  LOG(WARNING) << "=======" << pDecInsn->DumpString(pDexFile) << "\t======\n";
   const dex::MethodId& pMethodId = pDexFile->GetMethodId(targetIdx);
-  const dex::ClassDef& ClassDef = pDexFile->GetClassDef(pMethodId.class_idx_.index_);
-  ClassAccessor accessor(*pDexFile, ClassDef, /* parse_hiddenapi_class_data= */ true);
-  const char* classDescriptor = pDexFile->StringByTypeIdx(ClassDef.class_idx_);
-  LOG(WARNING) << "  Class descriptor  : " << classDescriptor << pDecInsn->DumpString(pDexFile).c_str();
-
-  u4 i = 0u;
-  const ClassAccessor::Method *target = nullptr;
-
-  for (const ClassAccessor::Method& method : accessor.GetDirectMethods()) {
-    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
-    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
-    fprintf(stdout, "%s\n", name);
-
-    if (method.GetIndex() == targetIdx) {
-      target = &method;
-    }
-    ++i;
-  }
-  if (target == nullptr) {
-    i = 0u;
-    for (const ClassAccessor::Method &method : accessor.GetVirtualMethods()) {
-    const dex::MethodId &pMethodId = pDexFile->GetMethodId(method.GetIndex());
-    const char *name = pDexFile->StringDataByIdx(pMethodId.name_idx_);
-    fprintf(stdout, "%s\n", name);
-    if (method.GetIndex() == targetIdx) {
-      target = &method;
-    }
-    ++i;
-    }
-  }
-
-  u4 targetFlags;
-  // this method not exist in this current dex file, maybe it primitive type
-  if (target == nullptr) {
-    targetFlags = 0x00001; // TODO : make ensure assume
-    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, external);
-  } else {
-    targetFlags = target->GetAccessFlags();
-    ::llvm::Function *func = CreateFunction(pDexFile, pCode, targetIdx, targetFlags, internal);
-  }
-
+  ::llvm::Function *func = CreateFunctionDeclare(pDexFile, pCode, targetIdx, 0x00001, external);
   const char *shorty = pDexFile->GetMethodShorty(targetIdx);
-  ::llvm::FunctionType* func_type = GetFunctionType(shorty, targetFlags);
+  ::llvm::FunctionType* func_type = GetFunctionType(shorty, 0x00001);
 
 
   std::vector< ::llvm::Value*> args;
@@ -710,9 +626,9 @@ void handleInvokeVirtual(const DexFile *pDexFile,
     args.push_back(info->val);
   }
 
-  ::llvm::CallInst *call = Builder->CreateCall(func_type, func_, args);
+  ::llvm::CallInst *call = Builder->CreateCall(func_type, func, args);
   func_->print(outs());
-  LOG(WARNING) << "===================================[InvokeVirtual]=====================================";
+  LOG(WARNING) << "======[InvokeVirtual]======";
 }
 
 void handleMove(const DexFile *pDexFile,
