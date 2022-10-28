@@ -696,7 +696,7 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
       break;
 
     default:
-      fprintf(gOutFile, " ???");
+      LOG(WARNING) << "[UNSUPPORTED iNSTRUCTION]\t " << pDecInsn->DumpString(pDexFile);
       break;
   } // switch
 }
