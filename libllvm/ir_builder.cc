@@ -678,6 +678,9 @@ void handleMove(const DexFile *pDexFile,
       u2 vB = pDecInsn->VRegB();
       ::llvm::Value *val_vA = local_in_reg[vA].val;
       ::llvm::Value *val_vB = local_in_reg[vB].val;
+      if (nullptr == val_vA || nullptr == val_vB)
+        break;
+
       new ::llvm::StoreInst(val_vB, val_vA, bb_);
       break;
 
