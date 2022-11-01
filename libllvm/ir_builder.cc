@@ -345,14 +345,10 @@ char RemapShorty(char shorty_type) {
     if (func_type == NULL) {
       return nullptr;
     }
-    func_type->print(outs());
     std::string symbol = pDexFile->PrettyMethod(idx);
     func = ::llvm::Function::Create(func_type, type, symbol, gMod);
-    func->print(outs());
 
     // TODO :: remove below codes after completed
-    LOG(WARNING) << "[DEBUG]";
-    func->print(outs());
     LOG(WARNING) << "============== Create Function Declare End =============";
   }
 
@@ -694,6 +690,9 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
                          const dex::CodeItem *pCode,
                          u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
                          const Instruction *pDecInsn)  {
+  LOG(WARNING) << "======================================================";
+  LOG(WARNING) << "[iNSTRUCTION]\t " << pDecInsn->DumpString(pDexFile);
+
   switch(pDecInsn->Opcode()) {
     case Instruction::MOVE:
     case Instruction::MOVE_FROM16:
@@ -723,7 +722,7 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
       break;
 
     default:
-      LOG(WARNING) << "[UNSUPPORTED iNSTRUCTION]\t " << pDecInsn->DumpString(pDexFile);
+      LOG(WARNING) << "[UNSUPPORTED iNSTRUCTION] ";
       break;
   } // switch
 }
