@@ -631,6 +631,37 @@ void handleInvokeVirtual(const DexFile *pDexFile,
   LOG(WARNING) << "======[InvokeVirtual]======";
 }
 
+void handleInvoke(const DexFile *pDexFile,
+                  const dex::CodeItem *pCode,
+                  u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
+                  const Instruction *pDecInsn)
+{
+  u4 targetIdx = pDecInsn->VRegB_35c();
+  u4 arg[5];
+  pDecInsn->GetVarArgs(arg);
+
+  LOG(WARNING) << "=========================================================";
+  const dex::MethodId& pMethodId = pDexFile->GetMethodId(targetIdx);
+  ::llvm::Function *func = CreateFunctionDeclare(pDexFile, pCode, targetIdx, 0x00001, external);
+  const char *shorty = pDexFile->GetMethodShorty(targetIdx);
+  ::llvm::FunctionType* func_type = GetFunctionType(shorty, 0x00001);
+
+  std::vector< ::llvm::Value*> args;
+  for (size_t i = 0, count = pDecInsn->VRegA_35c(); i < count; ++i) {
+    u4 v_reg = arg[i];
+    LocalInfo *info = &local_in_reg[v_reg];
+    if (nullptr == info->val)
+      break;
+
+    auto fnTy = func_type->getParamType(i);
+    auto regTy = info->val->getType();
+    args.push_back(info->val);
+  }
+
+  ::llvm::CallInst *call = Builder->CreateCall(func_type, func, args);
+  LOG(WARNING) << "=========================================================";
+}
+
 void handleMove(const DexFile *pDexFile,
                 const dex::CodeItem *pCode,
                 u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
@@ -683,13 +714,9 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
     case Instruction::RETURN_OBJECT:
       break;
     case Instruction::INVOKE_DIRECT:
-      handleInvokeDirect(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
-      break;
     case Instruction::INVOKE_SUPER:
-      handleInvokeSuper(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
-      break;
     case Instruction::INVOKE_VIRTUAL:
-      handleInvokeVirtual(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
+      handleInvoke(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
       break;
     case Instruction::CONST_HIGH16:
       handleConstHigh16(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
