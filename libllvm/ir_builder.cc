@@ -505,21 +505,42 @@ void handleReturnVoid() {
   Builder->CreateRetVoid();
 }
 
-void handleConstHigh16(const DexFile *pDexFile,
-                       const dex::CodeItem *pCode,
-                       u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
-                       const Instruction *pDecInsn) {
-  const s4 value = pDecInsn->VRegB() << 16;
-  const s4 vreg = pDecInsn->VRegA();
-  fprintf(gOutFile, " v%d, #int %d // #%x",
-          pDecInsn->VRegA(), value, (u2)pDecInsn->VRegB());
+void handleConst(const DexFile *pDexFile,
+                 const dex::CodeItem *pCode,
+                 u4 codeOffset, u4 insnIdx, u4 insnWidth, u4 flags,
+                 const Instruction *pDecInsn) {
+  s8 value;
+  s2 vreg;
+  ::llvm::Type *constType;
 
-  ::llvm::Type *i32t = ::llvm::Type::getInt32Ty(*ctx);
-  ::llvm::Value *num = ::llvm::ConstantInt::get(i32t, value, true);
-  auto *alloc = new ::llvm::AllocaInst(i32t, 0, "", bb_);
+  vreg = pDecInsn->VRegA();
+  value = pDecInsn->VRegB();
+
+  switch (pDecInsn->Opcode()) {
+  case Instruction::CONST:
+    constType = ::llvm::Type::getInt32Ty(*ctx);
+    break;
+  case Instruction::CONST_4:
+    constType = ::llvm::Type::getInt8Ty(*ctx);
+    break;
+  case Instruction::CONST_16:
+    constType = ::llvm::Type::getInt16Ty(*ctx);
+    break;
+  case Instruction::CONST_HIGH16:
+    constType = ::llvm::Type::getInt32Ty(*ctx);
+    value = value << 16;
+    break;
+  case Instruction::CONST_WIDE:
+  case Instruction::CONST_WIDE_16:
+  case Instruction::CONST_WIDE_32:
+    constType = ::llvm::Type::getInt64Ty(*ctx);
+    break;
+  }
+
+  ::llvm::Value *num = ::llvm::ConstantInt::get(constType, value, true);
+  auto *alloc = new ::llvm::AllocaInst(constType, 0, "", bb_);
   auto *store = new ::llvm::StoreInst(num, alloc, bb_);
-  auto *load = new ::llvm::LoadInst(i32t, alloc, "", bb_);
-
+  auto *load = new ::llvm::LoadInst(constType, alloc, "", bb_);
   local_in_reg[vreg].val = load;
   local_in_reg[vreg].val->print(outs());
 
@@ -720,8 +741,10 @@ void dumpInstructionAsIR(const DexFile *pDexFile,
     case Instruction::INVOKE_VIRTUAL:
       handleInvoke(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
       break;
+    case Instruction::CONST:
+    case Instruction::CONST_4:
     case Instruction::CONST_HIGH16:
-      handleConstHigh16(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
+      handleConst(pDexFile, pCode, codeOffset, insnIdx, insnWidth, flags, pDecInsn);
       break;
 
     default:
