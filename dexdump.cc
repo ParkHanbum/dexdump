@@ -717,11 +717,14 @@ static void dumpClassAnnotations(const DexFile* pDexFile, int idx) {
  */
 static void dumpInterface(const DexFile* pDexFile, const dex::TypeItem& pTypeItem, int i) {
   const char* interfaceName = pDexFile->StringByTypeIdx(pTypeItem.type_idx_);
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
-    fprintf(gOutFile, "    #%d              : '%s'\n", i, interfaceName);
-  } else {
-    std::unique_ptr<char[]> dot(descriptorToDot(interfaceName));
-    fprintf(gOutFile, "<implements name=\"%s\">\n</implements>\n", dot.get());
+
+  if (gOptions.outputDebugRelated) {
+    if (gOptions.outputFormat == OUTPUT_PLAIN) {
+      fprintf(gOutFile, "    #%d              : '%s'\n", i, interfaceName);
+    } else {
+      std::unique_ptr<char[]> dot(descriptorToDot(interfaceName));
+      fprintf(gOutFile, "<implements name=\"%s\">\n</implements>\n", dot.get());
+    }
   }
 }
 
@@ -1208,13 +1211,7 @@ static void dumpCodeAsIR(const DexFile *pDexFile, u4 idx, u4 flags,
  */
 static void dumpCode(const DexFile* pDexFile, u4 idx, u4 flags,
                      const dex::CodeItem* pCode, u4 codeOffset) {
-  CodeItemDebugInfoAccessor accessor(*pDexFile, pCode, idx);
 
-  fprintf(gOutFile, "      registers     : %d\n", accessor.RegistersSize());
-  fprintf(gOutFile, "      ins           : %d\n", accessor.InsSize());
-  fprintf(gOutFile, "      outs          : %d\n", accessor.OutsSize());
-  fprintf(gOutFile, "      insns size    : %d 16-bit code units\n",
-          accessor.InsnsSizeInCodeUnits());
 
   // Bytecode disassembly, if requested.
   if (gOptions.disassemble) {
@@ -1223,34 +1220,43 @@ static void dumpCode(const DexFile* pDexFile, u4 idx, u4 flags,
 
   // Bytecode conversion, if requested.
   if (gOptions.disassembleAsIR) {
-
     llvm::dumpBytecodesAsIR(pDexFile, idx, flags, pCode, codeOffset);
   }
 
-  // Try-catch blocks.
-  dumpCatches(pDexFile, pCode);
+  if (gOptions.outputDebugRelated) {
+    CodeItemDebugInfoAccessor accessor(*pDexFile, pCode, idx);
 
-  // Positions and locals table in the debug info.
-  bool is_static = (flags & kAccStatic) != 0;
-  fprintf(gOutFile, "      positions     : \n");
-  accessor.DecodeDebugPositionInfo([&](const DexFile::PositionInfo& entry) {
-    fprintf(gOutFile, "        0x%04x line=%d\n", entry.address_, entry.line_);
-    return false;
-  });
-  fprintf(gOutFile, "      locals        : \n");
-  accessor.DecodeDebugLocalInfo(is_static,
-                                idx,
-                                [&](const DexFile::LocalInfo& entry) {
-    const char* signature = entry.signature_ != nullptr ? entry.signature_ : "";
-    fprintf(gOutFile,
-            "        0x%04x - 0x%04x reg=%d %s %s %s\n",
-            entry.start_address_,
-            entry.end_address_,
-            entry.reg_,
-            entry.name_,
-            entry.descriptor_,
-            signature);
-  });
+    fprintf(gOutFile, "      registers     : %d\n", accessor.RegistersSize());
+    fprintf(gOutFile, "      ins           : %d\n", accessor.InsSize());
+    fprintf(gOutFile, "      outs          : %d\n", accessor.OutsSize());
+    fprintf(gOutFile, "      insns size    : %d 16-bit code units\n",
+            accessor.InsnsSizeInCodeUnits());
+
+    // Try-catch blocks.
+    dumpCatches(pDexFile, pCode);
+
+    // Positions and locals table in the debug info.
+    bool is_static = (flags & kAccStatic) != 0;
+    fprintf(gOutFile, "      positions     : \n");
+    accessor.DecodeDebugPositionInfo([&](const DexFile::PositionInfo &entry) {
+      fprintf(gOutFile, "        0x%04x line=%d\n", entry.address_, entry.line_);
+      return false;
+    });
+    fprintf(gOutFile, "      locals        : \n");
+    accessor.DecodeDebugLocalInfo(is_static,
+                                  idx,
+                                  [&](const DexFile::LocalInfo &entry) {
+                                    const char *signature = entry.signature_ != nullptr ? entry.signature_ : "";
+                                    fprintf(gOutFile,
+                                            "        0x%04x - 0x%04x reg=%d %s %s %s\n",
+                                            entry.start_address_,
+                                            entry.end_address_,
+                                            entry.reg_,
+                                            entry.name_,
+                                            entry.descriptor_,
+                                            signature);
+                                  });
+  }
 }
 
 static std::string GetHiddenapiFlagStr(uint32_t hiddenapi_flags) {
@@ -1281,110 +1287,109 @@ static void dumpMethod(const ClassAccessor::Method& method, int i) {
   char* accessStr = createAccessFlagStr(flags, kAccessForMethod);
   const uint32_t hiddenapiFlags = method.GetHiddenapiFlags();
 
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
-    fprintf(gOutFile, "    #%d              : (in %s)\n", i, backDescriptor);
-    fprintf(gOutFile, "      name          : '%s'\n", name);
-    fprintf(gOutFile, "      type          : '%s'\n", typeDescriptor);
-    fprintf(gOutFile, "      access        : 0x%04x (%s)\n", flags, accessStr);
-    if (hiddenapiFlags != 0u) {
-      fprintf(gOutFile,
-              "      hiddenapi     : 0x%04x (%s)\n",
-              hiddenapiFlags,
-              GetHiddenapiFlagStr(hiddenapiFlags).c_str());
-    }
-    if (method.GetCodeItem() == nullptr) {
-      fprintf(gOutFile, "      code          : (none)\n");
-    } else {
-      fprintf(gOutFile, "      code          -\n");
-
-      if (gOptions.disassembleAsIR) {
-        dumpCode(&dex_file,
-                 method.GetIndex(),
-                 flags,
-                 method.GetCodeItem(),
-                 method.GetCodeItemOffset());
-
+  if (gOptions.outputDebugRelated) {
+    if (gOptions.outputFormat == OUTPUT_PLAIN) {
+      fprintf(gOutFile, "    #%d              : (in %s)\n", i, backDescriptor);
+      fprintf(gOutFile, "      name          : '%s'\n", name);
+      fprintf(gOutFile, "      type          : '%s'\n", typeDescriptor);
+      fprintf(gOutFile, "      access        : 0x%04x (%s)\n", flags, accessStr);
+      if (hiddenapiFlags != 0u) {
+            fprintf(gOutFile,
+                    "      hiddenapi     : 0x%04x (%s)\n",
+                    hiddenapiFlags,
+                    GetHiddenapiFlagStr(hiddenapiFlags).c_str());
+      }
+      if (method.GetCodeItem() == nullptr) {
+            fprintf(gOutFile, "      code          : (none)\n");
       } else {
-        dumpCode(&dex_file,
-                 method.GetIndex(),
-                 flags,
-                 method.GetCodeItem(),
-                 method.GetCodeItemOffset());
+            fprintf(gOutFile, "      code          -\n");
+            dumpCode(&dex_file,
+                     method.GetIndex(),
+                     flags,
+                     method.GetCodeItem(),
+                     method.GetCodeItemOffset());
       }
-    }
-    if (gOptions.disassemble) {
-      fputc('\n', gOutFile);
-    }
-  } else if (gOptions.outputFormat == OUTPUT_XML) {
-    const bool constructor = (name[0] == '<');
-
-    // Method name and prototype.
-    if (constructor) {
-      std::unique_ptr<char[]> dot(descriptorClassToName(backDescriptor));
-      fprintf(gOutFile, "<constructor name=\"%s\"\n", dot.get());
-      dot = descriptorToDot(backDescriptor);
-      fprintf(gOutFile, " type=\"%s\"\n", dot.get());
-    } else {
-      fprintf(gOutFile, "<method name=\"%s\"\n", name);
-      const char* returnType = strrchr(typeDescriptor, ')');
-      if (returnType == nullptr) {
-        LOG(ERROR) << "bad method type descriptor '" << typeDescriptor << "'";
-        goto bail;
+      if (gOptions.disassemble) {
+            fputc('\n', gOutFile);
       }
-      std::unique_ptr<char[]> dot(descriptorToDot(returnType + 1));
-      fprintf(gOutFile, " return=\"%s\"\n", dot.get());
-      fprintf(gOutFile, " abstract=%s\n", quotedBool((flags & kAccAbstract) != 0));
-      fprintf(gOutFile, " native=%s\n", quotedBool((flags & kAccNative) != 0));
-      fprintf(gOutFile, " synchronized=%s\n", quotedBool(
-          (flags & (kAccSynchronized | kAccDeclaredSynchronized)) != 0));
-    }
+    } else if (gOptions.outputFormat == OUTPUT_XML) {
+      const bool constructor = (name[0] == '<');
 
-    // Additional method flags.
-    fprintf(gOutFile, " static=%s\n", quotedBool((flags & kAccStatic) != 0));
-    fprintf(gOutFile, " final=%s\n", quotedBool((flags & kAccFinal) != 0));
-    // The "deprecated=" not knowable w/o parsing annotations.
-    fprintf(gOutFile, " visibility=%s\n>\n", quotedVisibility(flags));
-
-    // Parameters.
-    if (typeDescriptor[0] != '(') {
-      LOG(ERROR) << "ERROR: bad descriptor '" << typeDescriptor << "'";
-      goto bail;
-    }
-    char* tmpBuf = reinterpret_cast<char*>(malloc(strlen(typeDescriptor) + 1));
-    const char* base = typeDescriptor + 1;
-    int argNum = 0;
-    while (*base != ')') {
-      char* cp = tmpBuf;
-      while (*base == '[') {
-        *cp++ = *base++;
-      }
-      if (*base == 'L') {
-        // Copy through ';'.
-        do {
-          *cp = *base++;
-        } while (*cp++ != ';');
+      // Method name and prototype.
+      if (constructor) {
+            std::unique_ptr<char[]> dot(descriptorClassToName(backDescriptor));
+            fprintf(gOutFile, "<constructor name=\"%s\"\n", dot.get());
+            dot = descriptorToDot(backDescriptor);
+            fprintf(gOutFile, " type=\"%s\"\n", dot.get());
       } else {
-        // Primitive char, copy it.
-        if (strchr("ZBCSIFJD", *base) == nullptr) {
-          LOG(ERROR) << "ERROR: bad method signature '" << base << "'";
-          break;  // while
-        }
-        *cp++ = *base++;
+            fprintf(gOutFile, "<method name=\"%s\"\n", name);
+            const char *returnType = strrchr(typeDescriptor, ')');
+            if (returnType == nullptr) {
+          LOG(ERROR) << "bad method type descriptor '" << typeDescriptor << "'";
+          goto bail;
+            }
+            std::unique_ptr<char[]> dot(descriptorToDot(returnType + 1));
+            fprintf(gOutFile, " return=\"%s\"\n", dot.get());
+            fprintf(gOutFile, " abstract=%s\n", quotedBool((flags & kAccAbstract) != 0));
+            fprintf(gOutFile, " native=%s\n", quotedBool((flags & kAccNative) != 0));
+            fprintf(gOutFile, " synchronized=%s\n", quotedBool((flags & (kAccSynchronized | kAccDeclaredSynchronized)) != 0));
       }
-      // Null terminate and display.
-      *cp++ = '\0';
-      std::unique_ptr<char[]> dot(descriptorToDot(tmpBuf));
-      fprintf(gOutFile, "<parameter name=\"arg%d\" type=\"%s\">\n"
-                        "</parameter>\n", argNum++, dot.get());
-    }  // while
-    free(tmpBuf);
-    if (constructor) {
-      fprintf(gOutFile, "</constructor>\n");
-    } else {
-      fprintf(gOutFile, "</method>\n");
+
+      // Additional method flags.
+      fprintf(gOutFile, " static=%s\n", quotedBool((flags & kAccStatic) != 0));
+      fprintf(gOutFile, " final=%s\n", quotedBool((flags & kAccFinal) != 0));
+      // The "deprecated=" not knowable w/o parsing annotations.
+      fprintf(gOutFile, " visibility=%s\n>\n", quotedVisibility(flags));
+
+      // Parameters.
+      if (typeDescriptor[0] != '(') {
+            LOG(ERROR) << "ERROR: bad descriptor '" << typeDescriptor << "'";
+            goto bail;
+      }
+      char *tmpBuf = reinterpret_cast<char *>(malloc(strlen(typeDescriptor) + 1));
+      const char *base = typeDescriptor + 1;
+      int argNum = 0;
+      while (*base != ')') {
+            char *cp = tmpBuf;
+            while (*base == '[') {
+          *cp++ = *base++;
+            }
+            if (*base == 'L') {
+          // Copy through ';'.
+          do {
+            *cp = *base++;
+          } while (*cp++ != ';');
+            } else {
+          // Primitive char, copy it.
+          if (strchr("ZBCSIFJD", *base) == nullptr) {
+            LOG(ERROR) << "ERROR: bad method signature '" << base << "'";
+            break; // while
+          }
+          *cp++ = *base++;
+            }
+            // Null terminate and display.
+            *cp++ = '\0';
+            std::unique_ptr<char[]> dot(descriptorToDot(tmpBuf));
+            fprintf(gOutFile, "<parameter name=\"arg%d\" type=\"%s\">\n"
+                              "</parameter>\n",
+                    argNum++, dot.get());
+      } // while
+      free(tmpBuf);
+      if (constructor) {
+            fprintf(gOutFile, "</constructor>\n");
+      } else {
+            fprintf(gOutFile, "</method>\n");
+      }
     }
   }
 
+  else {
+    dumpCode(&dex_file,
+             method.GetIndex(),
+             flags,
+             method.GetCodeItem(),
+             method.GetCodeItemOffset());
+  }
  bail:
   free(typeDescriptor);
   free(accessStr);
@@ -1537,29 +1542,32 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   } else {
     superclassDescriptor = pDexFile->StringByTypeIdx(pClassDef.superclass_idx_);
   }
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
-    fprintf(gOutFile, "Class #%d            -\n", idx);
-    fprintf(gOutFile, "  Class descriptor  : '%s'\n", classDescriptor);
-    fprintf(gOutFile, "  Access flags      : 0x%04x (%s)\n", pClassDef.access_flags_, accessStr);
-    if (superclassDescriptor != nullptr) {
-      fprintf(gOutFile, "  Superclass        : '%s'\n", superclassDescriptor);
+
+  if (gOptions.outputDebugRelated) {
+    if (gOptions.outputFormat == OUTPUT_PLAIN) {
+      fprintf(gOutFile, "Class #%d            -\n", idx);
+      fprintf(gOutFile, "  Class descriptor  : '%s'\n", classDescriptor);
+      fprintf(gOutFile, "  Access flags      : 0x%04x (%s)\n", pClassDef.access_flags_, accessStr);
+      if (superclassDescriptor != nullptr) {
+        fprintf(gOutFile, "  Superclass        : '%s'\n", superclassDescriptor);
+      }
+      fprintf(gOutFile, "  Interfaces        -\n");
+    } else {
+      std::unique_ptr<char[]> dot(descriptorClassToName(classDescriptor));
+      fprintf(gOutFile, "<class name=\"%s\"\n", dot.get());
+      if (superclassDescriptor != nullptr) {
+        dot = descriptorToDot(superclassDescriptor);
+        fprintf(gOutFile, " extends=\"%s\"\n", dot.get());
+      }
+      fprintf(gOutFile, " interface=%s\n",
+              quotedBool((pClassDef.access_flags_ & kAccInterface) != 0));
+      fprintf(gOutFile, " abstract=%s\n", quotedBool((pClassDef.access_flags_ & kAccAbstract) != 0));
+      fprintf(gOutFile, " static=%s\n", quotedBool((pClassDef.access_flags_ & kAccStatic) != 0));
+      fprintf(gOutFile, " final=%s\n", quotedBool((pClassDef.access_flags_ & kAccFinal) != 0));
+      // The "deprecated=" not knowable w/o parsing annotations.
+      fprintf(gOutFile, " visibility=%s\n", quotedVisibility(pClassDef.access_flags_));
+      fprintf(gOutFile, ">\n");
     }
-    fprintf(gOutFile, "  Interfaces        -\n");
-  } else {
-    std::unique_ptr<char[]> dot(descriptorClassToName(classDescriptor));
-    fprintf(gOutFile, "<class name=\"%s\"\n", dot.get());
-    if (superclassDescriptor != nullptr) {
-      dot = descriptorToDot(superclassDescriptor);
-      fprintf(gOutFile, " extends=\"%s\"\n", dot.get());
-    }
-    fprintf(gOutFile, " interface=%s\n",
-            quotedBool((pClassDef.access_flags_ & kAccInterface) != 0));
-    fprintf(gOutFile, " abstract=%s\n", quotedBool((pClassDef.access_flags_ & kAccAbstract) != 0));
-    fprintf(gOutFile, " static=%s\n", quotedBool((pClassDef.access_flags_ & kAccStatic) != 0));
-    fprintf(gOutFile, " final=%s\n", quotedBool((pClassDef.access_flags_ & kAccFinal) != 0));
-    // The "deprecated=" not knowable w/o parsing annotations.
-    fprintf(gOutFile, " visibility=%s\n", quotedVisibility(pClassDef.access_flags_));
-    fprintf(gOutFile, ">\n");
   }
 
   // Interfaces.
@@ -1578,7 +1586,7 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   const u4 sSize = sData != nullptr ? DecodeUnsignedLeb128(&sData) : 0;
 
   // Static fields.
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
+  if (gOptions.outputFormat == OUTPUT_PLAIN && gOptions.outputDebugRelated) {
     fprintf(gOutFile, "  Static fields     -\n");
   }
   uint32_t i = 0u;
@@ -1588,7 +1596,7 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   }
 
   // Instance fields.
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
+  if (gOptions.outputFormat == OUTPUT_PLAIN && gOptions.outputDebugRelated) {
     fprintf(gOutFile, "  Instance fields   -\n");
   }
   i = 0u;
@@ -1598,7 +1606,7 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   }
 
   // Direct methods.
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
+  if (gOptions.outputFormat == OUTPUT_PLAIN && gOptions.outputDebugRelated) {
     fprintf(gOutFile, "  Direct methods    -\n");
   }
 
@@ -1610,7 +1618,7 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   }
 
   // Virtual methods.
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
+  if (gOptions.outputFormat == OUTPUT_PLAIN && gOptions.outputDebugRelated) {
     fprintf(gOutFile, "  Virtual methods   -\n");
   }
   i = 0u;
@@ -1620,7 +1628,7 @@ static void dumpClass(const DexFile* pDexFile, int idx, char** pLastPackage) {
   }
 
   // End of class.
-  if (gOptions.outputFormat == OUTPUT_PLAIN) {
+  if (gOptions.outputFormat == OUTPUT_PLAIN && gOptions.outputDebugRelated) {
     const char* fileName;
     if (pClassDef.source_file_idx_.IsValid()) {
       fileName = pDexFile->StringDataByIdx(pClassDef.source_file_idx_);

@@ -51,6 +51,7 @@ static void usage() {
   LOG(ERROR) << " -h : display file header details";
   LOG(ERROR) << " -i : ignore checksum failures";
   LOG(ERROR) << " -j : disable dex file verification";
+  LOG(ERROR) << " -r : output debug related message (to output filename)";
   LOG(ERROR) << " -l : output layout, either 'plain' or 'xml'";
   LOG(ERROR) << " -o : output file name (defaults to stdout)";
 }
@@ -62,11 +63,10 @@ int dexdumpDriver(int argc, char** argv) {
   // Reset options.
   bool wantUsage = false;
   memset(&gOptions, 0, sizeof(gOptions));
-  gOptions.verbose = true;
 
   // Parse all arguments.
   while (true) {
-    const int ic = getopt(argc, argv, "acdmefghijl:o:");
+    const int ic = getopt(argc, argv, "acdmefghijdl:o:");
     if (ic < 0) {
       break;  // done
     }
@@ -100,6 +100,9 @@ int dexdumpDriver(int argc, char** argv) {
         break;
       case 'j':  // disable dex file verification
         gOptions.disableVerifier = true;
+        break;
+      case 'r':  // output debug related message
+        gOptions.outputDebugRelated = true;
         break;
       case 'l':  // layout
         if (strcmp(optarg, "plain") == 0) {

@@ -44,6 +44,7 @@ struct Options {
   bool exportsOnly;
   bool ignoreBadChecksum;
   bool disableVerifier;
+  bool outputDebugRelated;
   bool showAnnotations;
   bool showCfg;
   bool showFileHeaders;
