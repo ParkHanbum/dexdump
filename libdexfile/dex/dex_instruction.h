@@ -206,6 +206,7 @@ class Instruction {
   // Collect the enums in a struct for better locality.
   struct InstructionDescriptor {
     uint32_t verify_flags;         // Set of VerifyFlag.
+    uint32_t eflags;
     Format format;
     IndexType index_type;
     uint8_t flags;                 // Set of Flags.
@@ -534,6 +535,11 @@ class Instruction {
   // Returns the flags for the given opcode.
   static uint8_t FlagsOf(Code opcode) {
     return kInstructionDescriptors[opcode].flags;
+  }
+
+// Returns the flags for the given opcode.
+  static uint32_t EFlagsOf(Code opcode) {
+    return kInstructionDescriptors[opcode].eflags;
   }
 
   // Return the verify flags for the given opcode.

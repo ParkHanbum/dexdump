@@ -38,7 +38,7 @@ const char* const Instruction::kInstructionNames[] = {
 #undef INSTRUCTION_NAME
 };
 
-static_assert(sizeof(Instruction::InstructionDescriptor) == 8u, "Unexpected descriptor size");
+static_assert(sizeof(Instruction::InstructionDescriptor) == 12u, "Unexpected descriptor size");
 
 static constexpr int8_t InstructionSizeInCodeUnitsByOpcode(Instruction::Code opcode,
                                                            Instruction::Format format) {
@@ -62,6 +62,7 @@ static constexpr int8_t InstructionSizeInCodeUnitsByOpcode(Instruction::Code opc
 Instruction::InstructionDescriptor const Instruction::kInstructionDescriptors[] = {
 #define INSTRUCTION_DESCR(opcode, c, p, format, index, flags, eflags, vflags) \
     { vflags, \
+      eflags, \
       format, \
       index, \
       flags, \
